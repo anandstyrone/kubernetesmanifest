@@ -32,15 +32,16 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                        sh """
-                            git config user.email "anandstyrone0316@gmail.com"
-                            git config user.name "Nandu"
-                            git add deployment.yaml
-                            git commit -m "Update image tag to ${params.DOCKERTAG} by Jenkins job ${env.BUILD_NUMBER}"
-                            git remote set-url origin https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GIT_USERNAME}/kubernetesmanifest.git
-                            git push origin HEAD:${env.BRANCH}
-                        """
-                    }
+    sh '''
+        git config user.email "anandstyrone0316@gmail.com"
+        git config user.name "Nandu"
+        git add deployment.yaml
+        git commit -m "Update image tag to $DOCKERTAG by Jenkins job $BUILD_NUMBER"
+        git remote set-url origin https://$GIT_USERNAME:$GIT_PASSWORD@github.com/$GIT_USERNAME/kubernetesmanifest.git
+        git push origin HEAD:$BRANCH
+    '''
+	          	}
+
                 }
             }
         }
