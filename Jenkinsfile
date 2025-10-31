@@ -2,54 +2,40 @@ pipeline {
     agent any
 
     environment {
-        GIT_CREDENTIALS_ID = 'github-credentials'
-        REPO_URL = 'https://github.com/anandstyrone/kubernetesmanifest.git'
-        BRANCH = 'main'
-    }
-
-    parameters {
-        string(name: 'DOCKERTAG', defaultValue: '', description: 'Docker image tag to deploy')
+        // Add any environment variables you need here
     }
 
     stages {
-        stage('Clone Manifest Repo') {
+        stage('Clone repository') {
             steps {
-                git url: "${env.REPO_URL}", branch: "${env.BRANCH}", credentialsId: "${env.GIT_CREDENTIALS_ID}"
+                checkout scm
             }
         }
 
-        stage('Update Kubernetes Manifest') {
+        stage('Update GIT') {
             steps {
                 script {
-                    sh """
-                        sed -i 's+raj80dockerid/test:[^ ]*+raj80dockerid/test:${params.DOCKERTAG}+g' deployment.yaml
-                    """
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                            sh '''
+                                git config user.email anandstyrone0316@gmail.com
+                                git config user.name Nandu
+
+                                echo "Contents before update:"
+                                cat deployment.yaml
+
+                                sed -i "s+anandnandu0316/test.*+anandnandu0316/test:${DOCKERTAG}+g" deployment.yaml
+
+                                echo "Contents after update:"
+                                cat deployment.yaml
+
+                                git add .
+                                git commit -m "Done by Jenkins Job changemanifest: ${BUILD_NUMBER}" || echo "No changes to commit"
+                                git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GIT_USERNAME}/kubernetesmanifest.git HEAD:main
+                            '''
+                        }
+                    }
                 }
-            }
-        }
-
-        stage('Commit and Push Changes') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-    sh '''
-        git config user.email "anandstyrone0316@gmail.com"
-        git config user.name "Nandu"
-        git add deployment.yaml
-        git commit -m "Update image tag to $DOCKERTAG by Jenkins job $BUILD_NUMBER"
-        git remote set-url origin https://$GIT_USERNAME:$GIT_PASSWORD@github.com/$GIT_USERNAME/kubernetesmanifest.git
-        git push origin HEAD:$BRANCH
-    '''
-	          	}
-
-                }
-            }
-        }
-
-        stage('Trigger Argo CD Sync') {
-            steps {
-                echo "Argo CD application will sync changes automatically or sync manually if configured."
-                // sh 'argocd app sync <your-argocd-app-name>'  // Uncomment if argocd CLI installed & configured
             }
         }
     }
