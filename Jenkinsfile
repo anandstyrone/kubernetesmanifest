@@ -1,28 +1,52 @@
-node {
-    def app
+properties([
+    parameters([
+        string(name: 'DOCKERTAG', defaultValue: '', description: 'Docker image tag to deploy')
+    ])
+])
 
-    stage('Clone repository') {
-      
+pipeline {
+    agent any
 
-        checkout scm
+    environment {
+        GIT_CREDENTIALS_ID = 'github-credentials'
+        REPO_URL = 'https://github.com/anandstyrone/kubernetesmanifest.git'
+        BRANCH = 'main'
     }
 
-    stage('Update GIT') {
-            script {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withCredentials([usernamePassword(credentialsId: 'github', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-                        //def encodedPassword = URLEncoder.encode("$GIT_PASSWORD",'UTF-8')
-                        sh "git config user.email raj@cloudwithraj.com"
-                        sh "git config user.name RajSaha"
-                        //sh "git switch master"
-                        sh "cat deployment.yaml"
-                        sh "sed -i 's+raj80dockerid/test.*+raj80dockerid/test:${DOCKERTAG}+g' deployment.yaml"
-                        sh "cat deployment.yaml"
-                        sh "git add ."
-                        sh "git commit -m 'Done by Jenkins Job changemanifest: ${env.BUILD_NUMBER}'"
-                        sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${GIT_USERNAME}/kubernetesmanifest.git HEAD:main"
-      }
+    stages {
+        stage('Clone Manifest Repo') {
+            steps {
+                git url: "${env.REPO_URL}", branch: "${env.BRANCH}", credentialsId: "${env.GIT_CREDENTIALS_ID}"
+            }
+        }
+
+        stage('Update Kubernetes Manifest') {
+            steps {
+                script {
+                    sh """
+                        sed -i 's+anandnandu0316/test:[^ ]*+anandnandu0316/test:${params.DOCKERTAG}+g' deployment.yaml
+                    """
+                    sh """
+                        git config user.email "anandstyrone0316@gmail.com"
+                        git config user.name "Nandu"
+                        git add deployment.yaml
+                        git commit -m "Update image tag to ${params.DOCKERTAG} by Jenkins job"
+                        git push origin ${env.BRANCH}
+                    """
+                }
+            }
+        }
+
+        stage('Trigger Argo CD Sync') {
+            steps {
+                // Option 1: If you have argocd CLI installed on Jenkins agent
+                // sh 'argocd app sync <your-argocd-app-name>'
+
+                // Option 2: If Argo CD is configured to auto-sync on Git changes, skip this stage
+
+                echo "Argo CD application will sync changes automatically or sync manually if configured."
+            }
+        }
     }
-  }
 }
-}
+
